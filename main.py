@@ -1,4 +1,4 @@
-how from requests import session
+from requests import session
 from bs4 import BeautifulSoup
 from json import load
 from os import environ
