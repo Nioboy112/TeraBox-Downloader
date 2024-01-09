@@ -82,5 +82,5 @@ def download(url: str) -> str:
 
 
 # Example usage
-dlink = download('https://teraboxapp.com/s/1ZqumlUbwrc32c40geaQsVg')
+dlink = download('https://teraboxapp.com/s/1z7a_DAjTXqLIhueiEoJVGA')
 print(dlink)
