@@ -1,4 +1,4 @@
-from requests import session
+how from requests import session
 from bs4 import BeautifulSoup
 from json import load
 from os import environ
@@ -72,4 +72,4 @@ def terabox(url) -> str:
 
 # Usage: Call the function with the desired URL
 # Example usage:
-# download_link = terabox('https://www.example.com')
+# download_link = terabox('https://teraboxapp.com/s/1z7a_DAjTXqLIhueiEoJVGA')
