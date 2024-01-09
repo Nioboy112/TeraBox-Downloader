@@ -1,86 +1,75 @@
-from urllib.parse import urlparse, parse_qs
-import requests
-import re
+from requests import session
+from bs4 import BeautifulSoup
+from json import load
+from os import environ
+
+with open('config.json', 'r') as f: DATA = load(f)
+def getenv(var): return environ.get(var) or DATA.get(var, None)
 
 
-def extract_domain_and_surl(url):
-    """
-    Extracts the domain name and 'surl' value from a given URL.
+UPTOBOX_TOKEN = getenv("UPTOBOX_TOKEN")
+ndus = getenv("TERA_COOKIE")
+if ndus is None: TERA_COOKIE = None
+else: TERA_COOKIE = {"ndus": ndus}
 
-    Args:
-        url (str): The URL to extract domain name and 'surl' value from.
+def terabox(url) -> str:
+    sess = session()
 
-    Returns:
-        tuple: A tuple containing the domain name and 'surl' value as (domain_name, surl_value).
-    """
+    # Example URL provided as an argument
+    # url = 'https://www.example.com'
 
-    return urlparse(url).netloc, parse_qs(urlparse(url).query).get('surl', [''])[0]
+    while True:
+        try: 
+            res = sess.get(url)
+            print("connected")
+            break
+        except: 
+            print("retrying")
+    
+    key = res.url.split('?surl=')[-1]
+    url = f'http://www.terabox.com/wap/share/filelist?surl={key}'
+    sess.cookies.update(TERA_COOKIE)
 
+    while True:
+        try: 
+            res = sess.get(url)
+            print("connected")
+            break
+        except Exception as e: 
+            print("retrying")
 
-def parseCookieFile(cookiefile):
-    """
-    Parse cookies from a file in Netscape format.
+    key = res.url.split('?surl=')[-1]
+    soup = BeautifulSoup(res.content, 'lxml')
+    jsToken = None
 
-    Args:
-        cookiefile (str): Path to the cookies file.
+    for fs in soup.find_all('script'):
+        fstring = fs.string
+        if fstring and fstring.startswith('try {eval(decodeURIComponent'):
+            jsToken = fstring.split('%22')[1]
 
-    Returns:
-        dict: A dictionary containing cookies as key-value pairs.
-    """
+    while True:
+        try:
+            res = sess.get(f'https://www.terabox.com/share/list?app_id=250528&jsToken={jsToken}&shorturl={key}&root=1')
+            print("connected")
+            break
+        except: 
+            print("retrying")
+    
+    result = res.json()
 
-    cookies = {}
-    with open(cookiefile, 'r') as fp:
-        for line in fp:
-            if not line.startswith('#'):
-                line_fields = line.strip().split('\t')
-                # Make sure the line has at least 7 fields, as per Netscape format
-                if len(line_fields) >= 7:
-                    # Extract the cookie name and value
-                    cookie_name = line_fields[5]
-                    cookie_value = line_fields[6]
-                    cookies[cookie_name] = cookie_value
-    return cookies
+    if result['errno'] != 0: 
+        return f"ERROR: '{result['errmsg']}' Check cookies"
 
+    result = result['list']
+    if len(result) > 1: 
+        return "ERROR: Can't download multiple files"
 
-def download(url: str) -> str:
-    """
-    Downloads data from a given URL and returns the result.
+    result = result[0]
+    if result['isdir'] != '0':
+        return "ERROR: Can't download folder"
 
-    Args:
-        url (str): The URL to download data from.
+    return result.get('dlink', "Error")
 
-    Returns:
-        str: The downloaded data.
-    """
-
-    axios = requests.Session()
-
-    # Load cookies from 'cookies.txt'
-    cookies = parseCookieFile('cookies.txt')
-    axios.cookies.update(cookies)
-
-    response = axios.get(url)
-    domain, key = extract_domain_and_surl(response.url)
-
-    headers = {
-        'Accept': 'application/json, text/plain, */*',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Referer': f'https://{domain}/sharing/link?surl={key}',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.82 Safari/537.36'
-    }
-
-    response = axios.get(
-        f'https://www.terabox.com/share/list?app_id=250528&shorturl={key}&root=1', headers=headers)
-
-    try:
-        result = response.json()['list'][0]['dlink']
-    except KeyError:
-        print("Failed to get download link")
-    else:
-        return result
-
-
-# Example usage
-dlink = download('https://teraboxapp.com/s/1z7a_DAjTXqLIhueiEoJVGA')
-print(dlink)
+# Usage: Call the function with the desired URL
+# Example usage:
+# download_link = terabox('https://www.example.com')
